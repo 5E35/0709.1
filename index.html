@@ -7,7 +7,7 @@
     <script type="module">
         // Firebaseの設定
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.4.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/9.4.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.4.0/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyDFCHH_eiKoiKqQl3R8i3NQAujIEe8OFlY",
@@ -49,46 +49,8 @@
 
                 document.getElementById('askForm').reset(); // フォームをリセット
                 showPage('homePage'); // ホームページに移動
-                loadAnsweredQuestions(); // 回答済みの質問を更新
             } catch (error) {
                 console.error("Error adding document: ", error);
-            }
-        }
-
-        // Firestoreから回答済み質問を読み込む関数
-        window.loadAnsweredQuestions = async function() {
-            const answeredQuestionsList = document.getElementById('answeredQuestionsList');
-            answeredQuestionsList.innerHTML = '';
-
-            try {
-                const querySnapshot = await getDocs(query(collection(db, 'questions'), where('answered', '==', true)));
-                querySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const listItem = document.createElement('li');
-                    listItem.textContent = `${data.question} - ${data.answer}`;
-                    answeredQuestionsList.appendChild(listItem);
-                });
-            } catch (error) {
-                console.error("Error getting documents: ", error);
-            }
-        }
-
-        // Firestoreから未回答の質問を読み込む関数
-        window.loadUnansweredQuestions = async function() {
-            const unansweredQuestionsList = document.getElementById('unansweredQuestionsList');
-            unansweredQuestionsList.innerHTML = '';
-
-            try {
-                const querySnapshot = await getDocs(query(collection(db, 'questions'), where('answered', '==', false)));
-                querySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const listItem = document.createElement('li');
-                    listItem.textContent = data.question;
-                    listItem.onclick = () => showAnswerForm(doc.id, data.question);
-                    unansweredQuestionsList.appendChild(listItem);
-                });
-            } catch (error) {
-                console.error("Error getting documents: ", error);
             }
         }
 
@@ -113,16 +75,29 @@
 
                 document.getElementById('answerForm').reset(); // フォームをリセット
                 showPage('homePage'); // ホームページに移動
-                loadAnsweredQuestions(); // 回答済みの質問を更新
             } catch (error) {
                 console.error("Error updating document: ", error);
             }
         }
 
-        // ページロード時に回答済み質問を読み込む
+        // ページロード時に質問と回答のリアルタイム更新を行う
         window.onload = () => {
             showPage('homePage');
-            loadAnsweredQuestions();
+            // 質問リストのリアルタイム更新
+            onSnapshot(collection(db, 'questions'), (snapshot) => {
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === 'added' || change.type === 'modified') {
+                        const data = change.doc.data();
+                        if (data.answered) {
+                            // 回答済みの質問を更新
+                            loadAnsweredQuestions();
+                        } else {
+                            // 未回答の質問を更新
+                            loadUnansweredQuestions();
+                        }
+                    }
+                });
+            });
         }
     </script>
     <style>
@@ -205,7 +180,6 @@
     </style>
 </head>
 <body>
-      
     <div id="main">
         <button id="askBtn">質問する</button>
         <button id="answerBtn">回答する</button>
